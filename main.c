@@ -312,9 +312,11 @@ int wmain(int argc, WCHAR *argv[]) {
   fill_path_to_device_dict();
 
   if (argc < 2) {
-    printf("Usage:\n%S <filename>\n", argv[0]);
+    printf("Usage:\n%S <filename> [-c]\n (-c for close)", argv[0]);
     return 1;
   }
+  
+  BOOLEAN will_close = argc >= 3 && (wcscmp(argv[2], L"-c") == 0);
 
   WCHAR *disk = wcschr(argv[1], L'\\');
   if (!disk) {
@@ -412,14 +414,20 @@ int wmain(int argc, WCHAR *argv[]) {
           printf("[%#x] \"%.*S\": \"%.*S\" (PID: %u)\n", handle.Handle,
                  objectTypeInfo->Name.Length / 2, objectTypeInfo->Name.Buffer,
                  objectName.Length / 2, objectName.Buffer, handle.ProcessId);
-          CloseHandle(dupHandle);
-          if (!NT_SUCCESS(
-                  (status = NtDuplicateObject(
-                       OpenProcess(PROCESS_DUP_HANDLE, FALSE, handle.ProcessId),
-                       handle.Handle, GetCurrentProcess(), &dupHandle, 0, 0,
-                       DUPLICATE_CLOSE_SOURCE)))) {
-            printf("[%#x] Error %p (dub close)\n", handle.Handle, status);
-            continue;
+          WCHAR *system_cmdline = malloc(100 * sizeof(WCHAR));
+          wsprintf(system_cmdline, L"tasklist /fi \"PID eq %u\" /v", handle.ProcessId);
+          _wsystem(system_cmdline);
+          free(system_cmdline);
+          if (will_close) {
+              CloseHandle(dupHandle);
+              if (!NT_SUCCESS(
+                      (status = NtDuplicateObject(
+                           OpenProcess(PROCESS_DUP_HANDLE, FALSE, handle.ProcessId),
+                           handle.Handle, GetCurrentProcess(), &dupHandle, 0, 0,
+                           DUPLICATE_CLOSE_SOURCE)))) {
+                printf("[%#x] Error %p (dub close)\n", handle.Handle, status);
+                continue;
+              }
           }
         }
       }
