@@ -354,6 +354,10 @@ int wmain(int argc, WCHAR *argv[]) {
   }
 
   for (i = 0; i < handleInfo->HandleCount; i++) {
+    if (i % 1000 == 0) {
+      printf("\r%d / %d                 ", i, handleInfo->HandleCount);
+      fflush(stdout);
+    }
     SYSTEM_HANDLE handle = handleInfo->Handles[i];
     HANDLE dupHandle = NULL;
     POBJECT_TYPE_INFORMATION objectTypeInfo;
@@ -381,6 +385,7 @@ int wmain(int argc, WCHAR *argv[]) {
     // 0x0012019f or 0x001A019F, on which NtQueryObject could hang.
     if (handle.GrantedAccess == 0x0012019f ||
         handle.GrantedAccess == 0x001A019F ||
+        handle.GrantedAccess == 0x0016019F ||
         handle.GrantedAccess == 0x00120189 ||
         handle.GrantedAccess == 0x001f01ff ||
         handle.GrantedAccess == 0x00120089 ||
@@ -411,11 +416,13 @@ int wmain(int argc, WCHAR *argv[]) {
         memcpy(name, objectName.Buffer, objectName.Length);
         char *name_hex = wcs2hex(name);
         if (!strncmp(name_hex, full_path_hex, strlen(full_path_hex))) {
+          printf("\n");
           printf("[%#x] \"%.*S\": \"%.*S\" (PID: %u)\n", handle.Handle,
                  objectTypeInfo->Name.Length / 2, objectTypeInfo->Name.Buffer,
                  objectName.Length / 2, objectName.Buffer, handle.ProcessId);
           WCHAR *system_cmdline = malloc(100 * sizeof(WCHAR));
           wsprintf(system_cmdline, L"tasklist /fi \"PID eq %u\" /v", handle.ProcessId);
+          wprintf(L"> %S\n", system_cmdline);
           _wsystem(system_cmdline);
           free(system_cmdline);
           if (will_close) {
